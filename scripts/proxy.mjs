@@ -77,7 +77,7 @@ async function main() {
 		!args[separator + 1]
 	) {
 		throw new Error(
-			'Usage: node scripts/proxy.mjs run --url https://proxy.example.com --project example --env development --session-file /path/to/session-cookie -- command [args]',
+			'Usage: node scripts/proxy.mjs run --url https://proxy.example.com --project example [--handoff-stdin | --session-file /path/to/session-cookie] -- command [args]',
 		);
 	}
 	if (flags.includes('--env') && option('--env') !== 'development') {
@@ -89,17 +89,44 @@ async function main() {
 	if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(project)) {
 		throw new Error('Invalid project');
 	}
-	const cookie = (
-		await readFile(
-			flags.includes('--session-file') ? option('--session-file') : sessionPath(url),
-			'utf8',
-		)
-	).trim();
-	const response = await fetch(new URL('/api/agent/environments/development/' + project, url), {
-		headers: {cookie},
-		redirect: 'error',
-		signal: AbortSignal.timeout(15000),
-	});
+	let response;
+	if (flags.includes('--handoff-stdin')) {
+		if (process.stdin.isTTY) {
+			throw new Error('Provide the single-use handoff on stdin, not in command arguments');
+		}
+		let token = '';
+		for await (const chunk of process.stdin) {
+			token += chunk.toString();
+			if (token.length > 256) {
+				throw new Error('Invalid handoff');
+			}
+		}
+		token = token.trim();
+		if (!/^[a-f0-9]{64}$/.test(token)) {
+			throw new Error('Invalid handoff');
+		}
+		response = await fetch(new URL('/api/environment-handoff', url), {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({token, project}),
+			redirect: 'error',
+			signal: AbortSignal.timeout(15000),
+		});
+		token = '';
+	}
+	if (!flags.includes('--handoff-stdin')) {
+		const cookie = (
+			await readFile(
+				flags.includes('--session-file') ? option('--session-file') : sessionPath(url),
+				'utf8',
+			)
+		).trim();
+		response = await fetch(new URL('/api/agent/environments/development/' + project, url), {
+			headers: {cookie},
+			redirect: 'error',
+			signal: AbortSignal.timeout(15000),
+		});
+	}
 	if (!response.ok) {
 		throw new Error('Environment access failed (HTTP ' + response.status + ')');
 	}

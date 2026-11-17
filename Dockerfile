@@ -56,6 +56,7 @@ COPY packages/integrations/src packages/integrations/src
 COPY packages/observability/src packages/observability/src
 COPY packages/utils/src packages/utils/src
 COPY --from=build /app/packages/web/dist packages/web/dist
+COPY scripts/proxy.mjs scripts/proxy.mjs
 COPY docker-entrypoint.sh ./
 
 ENV NODE_ENV=production

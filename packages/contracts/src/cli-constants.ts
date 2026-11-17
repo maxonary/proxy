@@ -5,6 +5,8 @@
 
 /** The `pap` functions, a script's and the CLI's alike. */
 export const PAP_METHODS = [
+	'environments',
+	'prepareEnvironment',
 	'connections',
 	'tools',
 	'call',

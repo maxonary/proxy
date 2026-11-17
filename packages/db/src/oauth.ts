@@ -138,14 +138,15 @@ export async function getAgentByAccessToken(
 		await wrapDb(() =>
 			db.oAuthGrant.findUnique({
 				where: {accessTokenHash},
-				select: {accessExpires: true, agent: {select: signedInAgentSelect}},
+				select: {id: true, accessExpires: true, agent: {select: signedInAgentSelect}},
 			}),
 		)
 	).map((grant) => {
 		if (!grant || grant.accessExpires <= new Date()) {
 			return null;
 		}
-		return toSignedInAgent(grant.agent);
+		const agent = toSignedInAgent(grant.agent);
+		return agent ? {...agent, oauthGrantId: grant.id} : null;
 	});
 }
 

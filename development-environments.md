@@ -24,6 +24,31 @@ Removing a key prunes both person and agent grants. Removing a membership delete
 
 The original bundle PUT and agent grant endpoints below remain available. The UI adds per-key editing without overwriting other keys. New endpoints: GET /environments/overview; PUT /environments/development/:project/keys; DELETE /environments/development/:project/keys/:name; PUT /environments/development/:project/sharing; POST /environments/development/:project/reveal; POST /environments/development/:project/history. All are under /api/orgs/:org.
 
+## One connection for MCP tools and development variables
+
+Connect the agent to Proxy through MCP once. The owner grants development keys to that same agent in Environments → Share. Tool permissions and variable grants stay separate: connecting alone grants no secrets.
+
+Through the existing MCP script tool, start a task and use:
+
+```js
+await pap.environments(); // only allowed projects and names; no values
+await pap.prepareEnvironment({project: 'example'});
+```
+
+The second call returns a `launcherUrl`, `url`, `project`, `names`, `expiresAt` and a single-use `token`. Download the launcher from that same Proxy instance into the development workspace. Run it with Node 20+:
+
+```sh
+node proxy.mjs run --url https://proxy.example.com --project example --handoff-stdin -- bun run dev
+```
+
+Supply the handoff token on stdin through the agent's terminal/process tool. Do not pass it in a URL or argument, log it, commit it, or save it as an environment variable. No CLI login or session cookie is required. The launcher fetches variables directly and injects them into the child process without writing a `.env` file. MCP receives key names and the short-lived capability, never variable values. The process and code it executes can read the values; child output is not redacted.
+
+The handoff expires after five minutes and can be redeemed once. A new handoff replaces an earlier unused one for the same agent/project. It is bound to the originating MCP OAuth grant: disconnecting it deletes outstanding handoffs. Agent revocation and current key grants are checked again at redemption; the handoff cannot gain keys granted after issuance. Retrieval is audited. Already-running processes keep their received values. The handoff cannot call MCP tools or access other projects.
+
+This requires an agent with both an MCP connection and a terminal in its development environment. A chat-only agent cannot start a local process. A client may need to refresh its MCP tool list after deployment to discover the new methods. The legacy login flow below remains supported.
+
+## Legacy standalone CLI
+
 Sign in once with an existing agent login:
 
 `node scripts/proxy.mjs login --url https://proxy.example.com`
@@ -37,4 +62,4 @@ The session file contains the Cookie header from an existing agent login, not a 
 
 The CLI fetches variables without printing them or writing an environment file, then injects them into the child process. Child output is inherited and is not redacted. Code running in that process can read its secrets.
 
-Access attempts with valid project names and authenticated agents are recorded in EnvironmentAccess with names and outcome only. The endpoint is not exposed as an MCP tool. Migration v067 must be applied before use. Workload identity and dynamic credential rotation are not included in this development-only version. Deleting a variable removes its grants; adding that name later requires a new grant. Deleting an organization removes its bundles and audit history.
+Access attempts with valid project names and authenticated agents are recorded in EnvironmentAccess with names and outcome only. Raw values are not exposed as an MCP tool. Apply all migrations, including v070 for MCP handoffs, before use. Workload identity and dynamic credential rotation are not included in this development-only version. Deleting a variable removes its grants; adding that name later requires a new grant. Deleting an organization removes its bundles and audit history.

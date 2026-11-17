@@ -1,3 +1,4 @@
+import {listAgentEnvironments, prepareEnvironment} from '../environments/handoff';
 import {Err, Ok, type Result} from 'ts-results-es';
 import {z} from 'zod';
 
@@ -42,6 +43,8 @@ const OWN_TASK = 'Your task is kept for you.';
 const NO_SANDBOXES = 'Sandboxes can’t be used from inside a sandbox: run sandbox_exec from outside it.';
 
 const ARGS = {
+	environments: z.tuple([]),
+	prepareEnvironment: z.tuple([z.object({project: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)})]),
 	connections: z.tuple([]),
 	tools: z.tuple([z.string().min(1)]),
 	call: z.tuple([z.string().min(1), z.string().min(1), z.record(z.string(), jsonSchema).optional()]),
@@ -54,6 +57,8 @@ const ARGS = {
 // command (`pap tools <connection>`), so what it is told names what it can run. Code in a sandbox
 // never starts or finishes a task, so the CLI has no command for either.
 const SCRIPT_USAGE: Record<PapMethod, string> = {
+	environments: 'pap.environments()',
+	prepareEnvironment: 'pap.prepareEnvironment({project})',
 	connections: 'pap.connections()',
 	tools: 'pap.tools(connection)',
 	call: 'pap.call(connection, tool, params)',
@@ -170,6 +175,18 @@ function answer(signedIn: SignedInAgent, options: HostOptions, state: HostState,
 			const finished = $(await finishAgentTask(caller, {...body, task: taskId}));
 			state.finished = true;
 			return finished;
+		}
+		if (method === 'environments' || method === 'prepareEnvironment') {
+			if (options.via !== 'mcp') {
+				return $(Err(ApiErr.forbidden()));
+			}
+			$(await requireOpenTask(signedIn, taskId));
+			if (method === 'environments') {
+				$(argsOf(options.via, method, ARGS.environments, args));
+				return $(await listAgentEnvironments(signedIn));
+			}
+			const [body] = $(argsOf(options.via, method, ARGS.prepareEnvironment, args));
+			return $(await prepareEnvironment(signedIn, body.project));
 		}
 		if (method === 'connections') {
 			$(argsOf(options.via, method, ARGS.connections, args));

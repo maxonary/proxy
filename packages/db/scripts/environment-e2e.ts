@@ -227,6 +227,113 @@ assert.equal(
 const granted = await call(runtime, 'GET', undefined, agentCookie);
 assert.equal(granted.headers.get('cache-control'), 'no-store');
 assert.deepEqual(await granted.json(), {variables: {PUBLIC: 'example-value'}});
+// The same OAuth connection used for MCP tools authorizes a one-use runtime handoff.
+const oauthToken = randomBytes(32).toString('hex');
+const oauthClient = await db.oAuthClient.create({
+	data: {
+		id: 'environment-client',
+		name: 'Example client',
+		redirectUris: ['https://example.test/callback'],
+	},
+});
+const oauthGrant = await db.oAuthGrant.create({
+	data: {
+		clientId: oauthClient.id,
+		agentId: agent.id,
+		userId: owner.id,
+		accessTokenHash: createHash('sha256').update(oauthToken).digest('hex'),
+		accessExpires: new Date(Date.now() + 3600000),
+		refreshTokenHash: createHash('sha256').update(randomBytes(32)).digest('hex'),
+		refreshExpires: new Date(Date.now() + 3600000),
+	},
+});
+async function mcpEnvironment(code: string) {
+	const response = await fetch(origin + '/mcp', {
+		method: 'POST',
+		headers: {Authorization: 'Bearer ' + oauthToken, 'Content-Type': 'application/json'},
+		body: JSON.stringify({
+			jsonrpc: '2.0',
+			id: 1,
+			method: 'tools/call',
+			params: {
+				name: 'script',
+				arguments: {
+					code: 'await pap.startTask({title:"Development",goal:"Run example app"}); ' + code,
+				},
+			},
+		}),
+	});
+	assert.equal(response.status, 200);
+	const payload = await response.json();
+	assert.ok(!payload.result.isError, payload.result.content[0].text);
+	return JSON.parse(payload.result.content[0].text.split('\n\n')[0]);
+}
+assert.ok(Array.isArray(await mcpEnvironment('return await pap.connections();')));
+const available = await mcpEnvironment('return await pap.environments();');
+assert.deepEqual(available, {environments: [{project: 'example', names: ['PUBLIC']}]});
+async function prepareHandoff() {
+	return mcpEnvironment('return await pap.prepareEnvironment({project:"example"});');
+}
+async function redeemHandoff(token: string, project = 'example') {
+	return call('/api/environment-handoff', 'POST', {token, project}, '');
+}
+let handoff = await prepareHandoff();
+const launcher = await fetch(handoff.launcherUrl);
+assert.equal(launcher.status, 200);
+assert.ok((await launcher.text()).includes('--handoff-stdin'));
+assert.ok(!JSON.stringify(handoff).includes('example-value'));
+assert.ok(!JSON.stringify(handoff).includes('private-value'));
+assert.equal((await redeemHandoff(handoff.token, 'different')).status, 403);
+const redeemed = await redeemHandoff(handoff.token);
+assert.equal(redeemed.status, 200);
+assert.equal(redeemed.headers.get('cache-control'), 'no-store');
+assert.deepEqual(await redeemed.json(), {variables: {PUBLIC: 'example-value'}});
+assert.equal((await redeemHandoff(handoff.token)).status, 403);
+handoff = await prepareHandoff();
+const racing = await Promise.all([redeemHandoff(handoff.token), redeemHandoff(handoff.token)]);
+assert.deepEqual(racing.map((response) => response.status).sort(), [200, 403]);
+handoff = await prepareHandoff();
+await db.environmentHandoff.updateMany({data: {expiresAt: new Date(0)}});
+assert.equal((await redeemHandoff(handoff.token)).status, 403);
+handoff = await prepareHandoff();
+await call(base + '/grants', 'PUT', {agentId: agent.id, names: []});
+assert.equal((await redeemHandoff(handoff.token)).status, 403);
+await call(base + '/grants', 'PUT', {agentId: agent.id, names: ['PUBLIC']});
+handoff = await prepareHandoff();
+const launched = Bun.spawn(
+	[
+		'node',
+		'scripts/proxy.mjs',
+		'run',
+		'--url',
+		origin,
+		'--project',
+		'example',
+		'--handoff-stdin',
+		'--',
+		'node',
+		'-e',
+		'process.exit(process.env.PUBLIC === "example-value" ? 31 : 32)',
+	],
+	{stdin: 'pipe', stdout: 'pipe', stderr: 'pipe'},
+);
+launched.stdin.write(handoff.token);
+launched.stdin.end();
+assert.equal(await launched.exited, 31);
+assert.equal(await new Response(launched.stdout).text(), '');
+assert.equal(await new Response(launched.stderr).text(), '');
+handoff = await prepareHandoff();
+await db.agent.update({where: {id: agent.id}, data: {revokedAt: new Date()}});
+assert.equal((await redeemHandoff(handoff.token)).status, 403);
+await db.agent.update({where: {id: agent.id}, data: {revokedAt: null}});
+handoff = await prepareHandoff();
+await db.oAuthGrant.delete({where: {id: oauthGrant.id}});
+assert.equal((await redeemHandoff(handoff.token)).status, 403);
+assert.equal(await db.environmentHandoff.count({where: {agentId: agent.id}}), 0);
+console.log(
+	'MCP connection: scoped handoff, no-login launcher, replay, concurrency, expiry and revocation passed',
+);
+
 assert.equal((await call(base, 'PUT', {SECRET: 'private-value'})).status, 200);
 assert.equal((await call(base, 'PUT', {PUBLIC: 'new-value'})).status, 200);
 assert.equal((await call(runtime, 'GET', undefined, agentCookie)).status, 403);

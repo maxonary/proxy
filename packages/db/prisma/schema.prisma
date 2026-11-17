@@ -333,6 +333,7 @@ model VaultEntry {
 // of it, which reaches the connections shared with every member alone; one that is shared stays
 // shared. The password is shown once, when it is made or reset; only its hash is kept.
 model Agent {
+  environmentHandoffs EnvironmentHandoff[]
   environmentGrants DevelopmentEnvironmentGrant[]
   id           String    @id @default(cuid())
   orgId        String
@@ -592,6 +593,7 @@ model OAuthCode {
 // Refreshing replaces both. Disconnecting it, revoking or deleting the agent, or the member who
 // signed it in leaving the organization, ends it.
 model OAuthGrant {
+  environmentHandoffs EnvironmentHandoff[]
   id               String   @id @default(cuid())
   clientId         String
   agentId          String
@@ -1221,4 +1223,16 @@ model DevelopmentEnvironmentKey {
   label String
   environment DevelopmentEnvironment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
   @@id([environmentId, name])
+}
+
+model EnvironmentHandoff {
+  oauthGrantId String
+  oauthGrant OAuthGrant @relation(fields: [oauthGrantId], references: [id], onDelete: Cascade)
+  tokenHash String @id
+  agentId String
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  project String
+  names String[]
+  expiresAt DateTime
+  @@index([expiresAt])
 }

@@ -6,6 +6,8 @@ import {type Experiment, organizationExperiments} from '@proxy/utils';
 // way by both. A module of its own, so tests that mock either of them still get it.
 
 export type SignedInAgent = {
+	/** MCP authorization that may issue short-lived development handoffs. */
+	oauthGrantId?: string;
 	agentId: string;
 	orgId: string;
 	// The member whose own the agent is, whose connections it reaches beside the shared ones; null

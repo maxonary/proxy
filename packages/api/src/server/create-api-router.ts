@@ -1,3 +1,5 @@
+import {fileURLToPath} from 'node:url';
+import {handleEnvironmentHandoff} from '../environments/handoff';
 import {handleOrgImageRoute} from '../orgs/image';
 import {deleteEnvironmentKey, environmentOverview, saveEnvironmentKey, shareEnvironmentKeys, revealEnvironmentKeys, environmentHistory} from '../environments/sharing';
 import {saveEnvironment, grantEnvironment, readEnvironment, listEnvironments, deleteEnvironment, listEnvironmentAccess} from '../environments/route';
@@ -124,6 +126,10 @@ export function createApiRouter(): express.Router {
 	router.use(CLI_GITHUB_API_PATH, withCliRelay('CLI GitHub API route', handleGitHubApiRoute));
 
 	router.use(express.json({limit: BODY_LIMIT}));
+	router.get('/api/environment-launcher.mjs', (_req, res) => {
+		res.type('application/javascript').sendFile(fileURLToPath(new URL('../../../../scripts/proxy.mjs', import.meta.url)));
+	});
+	router.post('/api/environment-handoff', wrapAsyncRoute('Environment handoff', handleEnvironmentHandoff));
 
 	// Sign-in and sign-out. No auth middleware: these mint or revoke the session cookie, and
 	// sign-out must succeed without a valid session. The OAuth endpoints and the magic-link verify

@@ -56,6 +56,7 @@ export function scriptToolDescription(via: 'mcp' | 'web' | 'harness'): string {
 					'pap.startTask({title, goal}) → {task}: what you will do for the person; `goal` without their private details. The script’s later calls are for it, and this page sends it with your later scripts until you finish it or start another.',
 				]
 			: []),
+		...(via === 'mcp' ? ['pap.environments() → allowed development projects and key names, never values.', 'pap.prepareEnvironment({project}) → a single-use handoff token expiring in 5 minutes. Download launcherUrl once to scripts/proxy.mjs in the development workspace. Use the returned URL/project with node scripts/proxy.mjs run --handoff-stdin --url URL --project PROJECT -- command; send only the token on stdin. No CLI login. Treat the token as a credential: do not log, commit or forward it. It only delivers currently granted development variables, not tool access. The command can read the injected variables.'] : []),
 		'pap.connections() → [{connection, integration, name?, account, shared, can}]',
 		'pap.tools(connection) → [{name, description, params}], params as JSON Schema',
 		'pap.call(connection, tool, params?) → what the tool answers',
