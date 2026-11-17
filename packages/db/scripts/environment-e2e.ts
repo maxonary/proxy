@@ -27,9 +27,13 @@ const migrate = Bun.spawn(
 	],
 	{env: process.env, stdout: 'pipe', stderr: 'pipe'},
 );
-const migrationCode = await migrate.exited;
+const [migrationCode, , migrationError] = await Promise.all([
+	migrate.exited,
+	new Response(migrate.stdout).text(),
+	new Response(migrate.stderr).text(),
+]);
 if (migrationCode !== 0) {
-	console.error(await new Response(migrate.stderr).text());
+	console.error(migrationError);
 	await server.close();
 	process.exit(1);
 }
@@ -81,6 +85,7 @@ const agent = await db.agent.create({
 });
 async function call(path: string, method = 'GET', body?: object, cookie = humanCookie) {
 	return fetch(origin + path, {
+		signal: AbortSignal.timeout(30000),
 		method,
 		headers: {Origin: origin, Cookie: cookie, 'Content-Type': 'application/json'},
 		...(body ? {body: JSON.stringify(body)} : {}),
@@ -249,6 +254,7 @@ const oauthGrant = await db.oAuthGrant.create({
 });
 async function mcpEnvironment(code: string) {
 	const response = await fetch(origin + '/mcp', {
+		signal: AbortSignal.timeout(30000),
 		method: 'POST',
 		headers: {Authorization: 'Bearer ' + oauthToken, 'Content-Type': 'application/json'},
 		body: JSON.stringify({
