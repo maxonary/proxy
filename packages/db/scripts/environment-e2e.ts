@@ -6,10 +6,6 @@ import {startPrismaDevServer} from '@prisma/dev';
 const server = await startPrismaDevServer({
 	name: 'environment-e2e-' + process.pid,
 	persistenceMode: 'stateless',
-	port: 55413,
-	databasePort: 55414,
-	shadowDatabasePort: 55415,
-	streamsPort: 55416,
 });
 process.env.DATABASE_URL =
 	server.database.prismaORMConnectionString ?? server.database.connectionString;
