@@ -14,7 +14,7 @@ Body: {"agentId":"agent-id","names":["API_KEY","SERVICE_URL"]}
 
 An empty names list revokes access. Grants are explicit, with no inherited connection defaults. Agents must belong to the same organization.
 
-Open **Environments** for a service/environment overview: key count, people with access, last retrieval and successful retrievals over the full last 30 days. There is no Agents column. Opening a service shows readable key names and masked values. The Share dialog grants selected keys to people or agents; only the organization owner can change keys or permissions. Members can reveal only explicitly shared keys.
+Open **Environments** for a service/environment overview: key count, people with access, last retrieval and successful retrievals over the full last 30 days. There is no Agents column. Opening a service expands its variables inline beneath the row; opening another service closes the previous one. Each variable expands separately for explicit value reveal and inline editing. Closing a variable or changing services clears revealed values. The Share dialog grants selected keys to people or agents; only the organization owner can change keys or permissions. Members can reveal only explicitly shared keys.
 
 Service recognition uses variable names and the existing catalog, never secret values. Owners can correct the service and display name. Unrecognized keys are grouped under Other configuration. Existing bundles remain intact and retain their CLI project identifiers.
 
