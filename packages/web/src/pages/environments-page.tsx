@@ -1,3 +1,9 @@
+import {
+	EnvironmentPreview,
+	EnvironmentKeysPreview,
+	EnvironmentPeoplePreview,
+	EnvironmentActivityPreview,
+} from '@/components/environment-preview';
 import {EnvironmentKeyEntry} from '@/components/environment-key-entry';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {z} from 'zod';
@@ -339,47 +345,116 @@ function EnvironmentList({org}: {org: string}) {
 											className="group border-b border-border/40 hover:bg-muted/40"
 										>
 											<td className="px-3 py-4">
-												<button
-													className="flex items-center gap-3 text-left font-medium hover:underline"
-													onClick={() => open(item)}
+												<EnvironmentPreview
+													label={`Keys for ${item.service} ${item.project}`}
+													title={item.service}
+													trigger={
+														<span className="flex items-center gap-3 font-medium">
+															<ServiceMark service={item.service} />
+															{item.service}
+														</span>
+													}
 												>
-													<ServiceMark service={item.service} />
-													{item.service}
-												</button>
+													<EnvironmentKeysPreview row={item} onDetails={() => open(item)} />
+												</EnvironmentPreview>
 											</td>
 											<td className="px-3 py-4">
-												<span className="rounded-md bg-muted px-2 py-1 text-xs">
-													{item.project}
-												</span>
-												<span className="pt-1 block text-xs text-muted-foreground">
+												<EnvironmentPreview
+													label={`Environment ${item.project} for ${item.service}`}
+													title="Environment"
+													trigger={
+														<span className="rounded-md bg-muted px-2 py-1 text-xs">
+															{item.project}
+														</span>
+													}
+												>
+													<dl className="grid gap-2">
+														<div>
+															<dt className="text-xs text-muted-foreground">Project</dt>
+															<dd className="break-all">{item.project}</dd>
+														</div>
+														<div>
+															<dt className="text-xs text-muted-foreground">Target</dt>
+															<dd>Development</dd>
+														</div>
+														<div>
+															<dt className="text-xs text-muted-foreground">Import source</dt>
+															<dd>Not recorded for this snapshot</dd>
+														</div>
+													</dl>
+													<p className="text-xs text-muted-foreground">
+														Variables are stored snapshots, not automatically synced. Service labels
+														identify the vendor from key names or manual edits; they do not identify
+														the import source.
+													</p>
+												</EnvironmentPreview>
+												<span className="block pt-1 text-xs text-muted-foreground">
 													Development
 												</span>
 											</td>
-											<td className="px-3 py-4 tabular-nums">{item.keys.length}</td>
+											<td className="px-3 py-4 tabular-nums">
+												<EnvironmentPreview
+													label={`${item.keys.length} keys for ${item.service} ${item.project}`}
+													title={`${item.service} keys`}
+													trigger={item.keys.length}
+												>
+													<EnvironmentKeysPreview row={item} onDetails={() => open(item)} />
+												</EnvironmentPreview>
+											</td>
 											<td className="px-3 py-4">
-												<div className="flex -space-x-1">
-													{data?.people
-														.filter((p) => item.people.includes(p.userId))
-														.map((person) => (
-															<span
-																key={person.userId}
-																title={
-																	(person.name ?? person.email) + (person.owner ? ' · Owner' : '')
-																}
-																className="rounded-full ring-2 ring-background"
-															>
-																<PersonAvatar person={person} />
-																<span className="sr-only">{person.name ?? person.email}</span>
-															</span>
-														))}
-												</div>
+												<EnvironmentPreview
+													label={`People with access to ${item.service} ${item.project}`}
+													title="People with access"
+													trigger={
+														<div className="flex -space-x-1">
+															{data?.people
+																.filter((p) => item.people.includes(p.userId))
+																.map((person) => (
+																	<span
+																		key={person.userId}
+																		title={
+																			(person.name ?? person.email) +
+																			(person.owner ? ' · Owner' : '')
+																		}
+																		className="rounded-full ring-2 ring-background"
+																	>
+																		<PersonAvatar person={person} />
+																		<span className="sr-only">{person.name ?? person.email}</span>
+																	</span>
+																))}
+														</div>
+													}
+												>
+													<EnvironmentPeoplePreview
+														row={item}
+														people={data?.people ?? []}
+														canManage={data?.canManage ?? false}
+														onDetails={() => open(item, 'sharing')}
+													/>
+												</EnvironmentPreview>
 											</td>
 											<td className="px-3 py-4 text-muted-foreground">
-												<time dateTime={item.lastAccess ?? undefined}>
-													{dateLabel(item.lastAccess)}
-												</time>
+												<EnvironmentPreview
+													label={`Last access to ${item.service} ${item.project}`}
+													title="Recent activity"
+													trigger={
+														<time dateTime={item.lastAccess ?? undefined}>
+															{dateLabel(item.lastAccess)}
+														</time>
+													}
+												>
+													<EnvironmentActivityPreview row={item} base={base} />
+												</EnvironmentPreview>
 											</td>
-											<td className="px-3 py-4 tabular-nums">{item.accesses30Days}</td>
+											<td className="px-3 py-4 tabular-nums">
+												<EnvironmentPreview
+													label={`Access activity for ${item.service} ${item.project}`}
+													title="Access activity"
+													trigger={item.accesses30Days}
+												>
+													<EnvironmentActivityPreview row={item} base={base} />
+												</EnvironmentPreview>
+											</td>
 											<td className="px-3 py-4">
 												{data?.canManage && (
 													<button
