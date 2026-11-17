@@ -541,6 +541,8 @@ assert.equal(await db.environmentAccess.count(), 0);
 console.log(
 	'HTTP authentication, encryption, explicit grants, variable removal, revocation and cascades passed',
 );
+const {closeIdleScriptRunner} = await import('../../api/src/script/run-script');
+await closeIdleScriptRunner();
 app.close();
 await db.$disconnect();
 await server.close();

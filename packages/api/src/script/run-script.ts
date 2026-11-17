@@ -81,6 +81,17 @@ function spawnRunner(maxOutputBytes: number): Result<Runner, ApiError> {
 // The runner started for the next script, while it loads QuickJS.
 let spare: Runner | null = null;
 
+/** Release the prewarmed worker when an embedded API shuts down. */
+export async function closeIdleScriptRunner(): Promise<void> {
+	const idle = spare;
+	spare = null;
+	if (idle === null) {
+		return;
+	}
+	idle.process.kill(9);
+	await idle.process.exited;
+}
+
 function takeRunner(maxOutputBytes: number): Result<Runner, ApiError> {
 	const ready = spare !== null && isRunning(spare) && spare.budget.max === maxOutputBytes ? spare : null;
 	if (spare !== null && ready === null) {
